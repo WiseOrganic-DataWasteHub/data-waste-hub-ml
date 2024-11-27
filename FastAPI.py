@@ -9,7 +9,10 @@ import numpy as np
 # Menggunakan backend non-interaktif untuk Matplotlib
 plt.switch_backend('Agg')
 
+# Inisialisasi aplikasi FastAPI
 app = FastAPI()
+
+# -------------------------- FUNGSI UTAMA --------------------------------
 
 # Fungsi untuk mendapatkan token
 def get_token():
@@ -25,34 +28,43 @@ def get_token():
     else:
         raise Exception(f"Failed to get token. Status Code: {response.status_code}, Response: {response.text}")
 
-# Fungsi untuk mengambil data dari API
-def fetch_data_with_token(month: int, year: int):
+# Fungsi untuk mengambil data dari API (fleksibel untuk bulan+tahun atau hanya tahun)
+def fetch_data_with_token(month: int = None, year: int = None):
     token = get_token()  # Ambil token secara otomatis
     headers = {"Authorization": f"Bearer {token}"}
-    url = f"http://34.101.242.121:3000/api/v1/waste-records/month/{month}/year/{year}"
+    
+    if month is not None and year is not None:
+        url = f"http://34.101.242.121:3000/api/v1/waste-records/month/{month}/year/{year}"
+    elif year is not None:
+        url = f"http://34.101.242.121:3000/api/v1/waste-records/year/{year}"
+    else:
+        raise Exception("Invalid parameters: Please specify either year or month and year.")
+
     response = requests.get(url, headers=headers)
     if response.status_code == 200:
         data = response.json()["data"]
-        if len(data) == 0:  # Cek apakah data kosong
-            raise Exception("No data available for the specified month and year")
+        if len(data) == 0:
+            raise Exception("No data available for the specified parameters.")
         return data
     else:
         raise Exception(f"Failed to fetch data. Status Code: {response.status_code}, Response: {response.text}")
 
+# -------------------------- ENDPOINTS -----------------------------------
+
 # Endpoint untuk mengambil data
 @app.get("/fetch-data/")
-def fetch_data(month: int = Query(...), year: int = Query(...)):
+def fetch_data(month: int = Query(None), year: int = Query(...)):
     try:
-        data = fetch_data_with_token(month, year)
+        data = fetch_data_with_token(month=month, year=year)
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
 
 # Endpoint untuk visualisasi bar chart
 @app.get("/visualize-bar-chart/")
-def visualize_bar_chart(month: int = Query(...), year: int = Query(...)):
+def visualize_bar_chart(month: int = Query(None), year: int = Query(...)):
     try:
-        data = fetch_data_with_token(month, year)
+        data = fetch_data_with_token(month=month, year=year)
         cleaned_data = [
             {
                 "departement_name": item["departement"]["departement_name"],
@@ -69,7 +81,15 @@ def visualize_bar_chart(month: int = Query(...), year: int = Query(...)):
             palette="cubehelix",
             edgecolor="black"
         )
-        plt.title(f"Total Berat Sampah per Departemen ({month}/{year})", fontsize=18, weight='bold', color='darkblue')
+        
+        # Judul dinamis berdasarkan parameter
+        title = f"Total Berat Sampah per Departemen"
+        if month is not None:
+            title += f" ({month}/{year})"
+        else:
+            title += f" (Tahun {year})"
+        
+        plt.title(title, fontsize=18, weight='bold', color='darkblue')
         plt.xlabel("Departemen", fontsize=14, weight='bold')
         plt.ylabel("Berat Sampah (kg)", fontsize=14, weight='bold')
         plt.xticks(rotation=45, fontsize=12, ha='right', weight='bold')
@@ -90,9 +110,9 @@ def visualize_bar_chart(month: int = Query(...), year: int = Query(...)):
 
 # Endpoint untuk visualisasi pie chart
 @app.get("/visualize-pie-chart/")
-def visualize_pie_chart(month: int = Query(...), year: int = Query(...)):
+def visualize_pie_chart(month: int = Query(None), year: int = Query(...)):
     try:
-        data = fetch_data_with_token(month, year)
+        data = fetch_data_with_token(month=month, year=year)
         cleaned_data = [
             {
                 "departement_name": item["departement"]["departement_name"],
@@ -135,7 +155,14 @@ def visualize_pie_chart(month: int = Query(...), year: int = Query(...)):
             fontsize=10,
             ncol=1
         )
-        plt.title(f"Distribusi Sampah per Departemen ({month}/{year})", fontsize=16, weight='bold')
+        
+        title = f"Distribusi Sampah per Departemen"
+        if month is not None:
+            title += f" ({month}/{year})"
+        else:
+            title += f" (Tahun {year})"
+        
+        plt.title(title, fontsize=16, weight='bold')
         plt.tight_layout()
         buf = io.BytesIO()
         plt.savefig(buf, format='png')
@@ -145,11 +172,12 @@ def visualize_pie_chart(month: int = Query(...), year: int = Query(...)):
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-# Endpoint untuk visualisasi pie chart berdasarkan jenis sampah
+# Endpoint untuk visualisasi pie chart berdasarkan kategori sampah
 @app.get("/visualize-pie-chart-categories/")
-def visualize_pie_chart_categories(month: int = Query(...), year: int = Query(...)):
+def visualize_pie_chart_categories(month: int = Query(None), year: int = Query(...)):
     try:
-        data = fetch_data_with_token(month, year)
+        data = fetch_data_with_token(month=month, year=year)
+        
         categories_data = []
         for item in data:
             for category in item.get("categories", []):
@@ -158,13 +186,18 @@ def visualize_pie_chart_categories(month: int = Query(...), year: int = Query(..
                         "category_name": category["category"]["category_name"],
                         "total_weight": category["total_weight"]
                     })
+        
         if not categories_data:
-            raise Exception("No category data available for the specified month and year")
+            raise Exception("No category data available for the specified parameters.")
+        
+        # Dataframe dan pengelompokan berdasarkan kategori
         df = pd.DataFrame(categories_data)
         grouped_df = df.groupby("category_name")["total_weight"].sum().reset_index()
         labels = grouped_df["category_name"]
         sizes = grouped_df["total_weight"]
         percentages = [f"{size / sizes.sum() * 100:.1f}%" for size in sizes]
+
+        # Membuat pie chart
         plt.figure(figsize=(14, 8))
         wedges, texts = plt.pie(
             sizes,
@@ -186,6 +219,8 @@ def visualize_pie_chart_categories(month: int = Query(...), year: int = Query(..
                 weight='bold',
                 arrowprops=dict(arrowstyle="-", color="black")
             )
+        
+        # Membuat legend
         legend_labels = [f"{label} ({percentage})" for label, percentage in zip(labels, percentages)]
         plt.legend(
             wedges,
@@ -196,12 +231,21 @@ def visualize_pie_chart_categories(month: int = Query(...), year: int = Query(..
             fontsize=10,
             ncol=1
         )
-        plt.title(f"Distribusi Jenis Sampah ({month}/{year})", fontsize=16, weight='bold')
+        
+        title = f"Distribusi Jenis Sampah"
+        if month is not None:
+            title += f" ({month}/{year})"
+        else:
+            title += f" (Tahun {year})"
+        
+        plt.title(title, fontsize=16, weight='bold')
         plt.tight_layout()
+
         buf = io.BytesIO()
         plt.savefig(buf, format='png')
         buf.seek(0)
         plt.close()
+        
         return Response(content=buf.getvalue(), media_type="image/png")
     except Exception as e:
         return {"success": False, "error": str(e)}
