@@ -275,3 +275,119 @@ def visualize_pie_chart_categories(day: int = Query(None), month: int = Query(No
         return Response(content=buf.getvalue(), media_type="image/png")
     except Exception as e:
         return {"success": False, "error": str(e)}
+
+@app.get("/visualize-pie-chart-summary/")
+def visualize_pie_chart_summary(day: int = Query(None), month: int = Query(None), year: int = Query(...)):
+    try:
+        # Ambil data dari API
+        data = fetch_data_with_token(day=day, month=month, year=year)
+
+        # Definisi kelompok jenis sampah
+        category_mapping = {
+            "Organik": ["WET ORGANIK"],
+            "Non-Organik": ["PET", "ALUMINIUM CAN", "TETRA PACK", "GLASS BOTTLE"],
+            "Residue": ["GENERAL PLASTIC RESIDUE", "GENERAL PAPER RESIDUE",
+                        "PLASTIK BAG LINER", "CANDLES", "SLIPPERS"]
+        }
+
+        # Data summary
+        summary_data = {"Organik": 0, "Non-Organik": 0, "Residue": 0}
+
+        # Debug: Print data untuk memastikan kategori diterima
+        print("Data received from API:", data)
+
+        # Proses data dengan validasi
+        for item in data:
+            for category in item.get("categories", []):
+                # Validasi untuk memastikan tidak ada key yang bernilai None
+                category_obj = category.get("category", {})
+                if not category_obj:  # Jika category kosong, lanjutkan ke iterasi berikutnya
+                    continue
+                category_name = category_obj.get("category_name", "").upper()
+                total_weight = category.get("total_weight", 0)
+
+                # Debug: Print setiap kategori yang diproses
+                print(f"Processing category: {category_name}, Weight: {total_weight}")
+
+                # Klasifikasi kategori
+                if category_name in category_mapping["Organik"]:
+                    summary_data["Organik"] += total_weight
+                elif category_name in category_mapping["Non-Organik"]:
+                    summary_data["Non-Organik"] += total_weight
+                elif category_name in category_mapping["Residue"]:
+                    summary_data["Residue"] += total_weight
+
+        # Debug: Print summary data setelah pengelompokan
+        print("Summary Data:", summary_data)
+
+        # Cek apakah data summary kosong
+        if sum(summary_data.values()) == 0:
+            raise Exception("No data available for the specified parameters.")
+
+        # Dataframe untuk plot
+        df_summary = pd.DataFrame(
+            {"Category": list(summary_data.keys()), "Total Weight": list(summary_data.values())}
+        )
+        sizes = df_summary["Total Weight"]
+        labels = df_summary["Category"]
+        percentages = [f"{size / sizes.sum() * 100:.1f}%" for size in sizes]
+
+        # Membuat pie chart
+        plt.figure(figsize=(14, 8))
+        wedges, texts = plt.pie(
+            sizes,
+            startangle=140,
+            colors=plt.cm.Paired.colors,
+            wedgeprops={'edgecolor': 'black'},
+        )
+        for i, wedge in enumerate(wedges):
+            angle = (wedge.theta2 - wedge.theta1) / 2 + wedge.theta1
+            x = np.cos(np.radians(angle))
+            y = np.sin(np.radians(angle))
+            plt.annotate(
+                labels[i],
+                xy=(x, y),
+                xytext=(x * 1.2, y * 1.2),
+                ha='center',
+                va='center',
+                fontsize=12,
+                weight='bold',
+                arrowprops=dict(arrowstyle="-", color="black")
+            )
+
+        # Membuat legend
+        legend_labels = [
+            f"{label} ({weight} kg) ({percentage})"
+            for label, weight, percentage in zip(labels, sizes, percentages)
+        ]
+        plt.legend(
+            wedges,
+            legend_labels,
+            title="Kelompok Sampah, Total Berat, dan Persentase",
+            loc="center left",
+            bbox_to_anchor=(1.1, 0.3),
+            fontsize=10,
+            ncol=1
+        )
+
+        # Judul dinamis
+        title = "Distribusi Sampah (Summary)"
+        if day is not None and month is not None:
+            title += f" ({day}/{month}/{year})"
+        elif month is not None:
+            title += f" ({month}/{year})"
+        else:
+            title += f" (Tahun {year})"
+
+        plt.title(title, fontsize=16, weight='bold')
+        plt.tight_layout()
+
+        # Simpan gambar ke buffer
+        buf = io.BytesIO()
+        plt.savefig(buf, format='png')
+        buf.seek(0)
+        plt.close()
+
+        return Response(content=buf.getvalue(), media_type="image/png")
+    except Exception as e:
+        return {"success": False, "error": str(e)}
