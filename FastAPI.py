@@ -66,7 +66,10 @@ def fetch_data(day: int = Query(None), month: int = Query(None), year: int = Que
 @app.get("/visualize-bar-chart/")
 def visualize_bar_chart(day: int = Query(None), month: int = Query(None), year: int = Query(...)):
     try:
+        # Ambil data dari API
         data = fetch_data_with_token(day=day, month=month, year=year)
+
+        # Dataframe dasar
         cleaned_data = [
             {
                 "departement_name": item["departement"]["departement_name"],
@@ -75,6 +78,10 @@ def visualize_bar_chart(day: int = Query(None), month: int = Query(None), year: 
             for item in data if item["departement"] is not None
         ]
         df = pd.DataFrame(cleaned_data)
+
+        all_departments = ["Front Office", "Accounting", "HRD", "Spa", "Security", "Kitchen", "Restaurant and Bar", "Garden"]
+        df = df.set_index("departement_name").reindex(all_departments, fill_value=0).reset_index()
+
         plt.figure(figsize=(14, 6))
         sns.barplot(
             data=df,
@@ -83,8 +90,8 @@ def visualize_bar_chart(day: int = Query(None), month: int = Query(None), year: 
             palette="cubehelix",
             edgecolor="black"
         )
-        
-        # Judul dinamis berdasarkan parameter
+
+        # Judul dinamis
         title = f"Total Berat Sampah per Departemen"
         if day is not None and month is not None:
             title += f" ({day}/{month}/{year})"
@@ -92,15 +99,17 @@ def visualize_bar_chart(day: int = Query(None), month: int = Query(None), year: 
             title += f" ({month}/{year})"
         else:
             title += f" (Tahun {year})"
-        
-        plt.title(title, fontsize=18, weight='bold', color='darkblue')
+
+        plt.title(title, fontsize=18, weight='bold', color='darkblue', pad=20)  # Tambahkan jarak antar elemen
         plt.xlabel("Departemen", fontsize=14, weight='bold')
         plt.ylabel("Berat Sampah (kg)", fontsize=14, weight='bold')
         plt.xticks(rotation=45, fontsize=12, ha='right', weight='bold')
         plt.yticks(fontsize=12, weight='bold')
 
+        # Tambahkan nilai di atas bar
         for index, row in df.iterrows():
-            plt.text(index, row.total_weight + 2, f"{row.total_weight} kg", ha='center', fontsize=10, color='black', weight='bold')
+            if row["total_weight"] > 0:  # Hanya jika ada nilai
+                plt.text(index, row["total_weight"] + 2, f"{row['total_weight']} kg", ha='center', fontsize=10, color='black', weight='bold')
 
         plt.grid(axis='y', linestyle='--', alpha=0.7)
         plt.tight_layout()
@@ -108,9 +117,11 @@ def visualize_bar_chart(day: int = Query(None), month: int = Query(None), year: 
         plt.savefig(buf, format='png')
         buf.seek(0)
         plt.close()
+
         return Response(content=buf.getvalue(), media_type="image/png")
     except Exception as e:
         return {"success": False, "error": str(e)}
+
 
 # Endpoint untuk visualisasi pie chart
 @app.get("/visualize-pie-chart/")
@@ -182,8 +193,10 @@ def visualize_pie_chart(day: int = Query(None), month: int = Query(None), year: 
 @app.get("/visualize-pie-chart-categories/")
 def visualize_pie_chart_categories(day: int = Query(None), month: int = Query(None), year: int = Query(...)):
     try:
+        # Ambil data dari API
         data = fetch_data_with_token(day=day, month=month, year=year)
         
+        # Data kategori sampah
         categories_data = []
         for item in data:
             for category in item.get("categories", []):
@@ -204,7 +217,7 @@ def visualize_pie_chart_categories(day: int = Query(None), month: int = Query(No
         percentages = [f"{size / sizes.sum() * 100:.1f}%" for size in sizes]
 
         # Membuat pie chart
-        plt.figure(figsize=(14, 8))
+        plt.figure(figsize=(16, 8))
         wedges, texts = plt.pie(
             sizes,
             startangle=140,
@@ -226,18 +239,22 @@ def visualize_pie_chart_categories(day: int = Query(None), month: int = Query(No
                 arrowprops=dict(arrowstyle="-", color="black")
             )
         
-        # Membuat legend
-        legend_labels = [f"{label} ({percentage})" for label, percentage in zip(labels, percentages)]
+        # Membuat legend dengan format baru
+        legend_labels = [
+            f"{label} ({weight} kg) ({percentage})"
+            for label, weight, percentage in zip(labels, sizes, percentages)
+        ]
         plt.legend(
             wedges,
             legend_labels,
-            title="Jenis Sampah dan Persentase",
+            title="Jenis Sampah, Total Berat, dan Persentase",
             loc="center left",
-            bbox_to_anchor=(1.1, 0.3),
+            bbox_to_anchor=(1.15, 0.5),
             fontsize=10,
             ncol=1
         )
         
+        # Judul dinamis
         title = f"Distribusi Jenis Sampah"
         if day is not None and month is not None:
             title += f" ({day}/{month}/{year})"
@@ -249,6 +266,7 @@ def visualize_pie_chart_categories(day: int = Query(None), month: int = Query(No
         plt.title(title, fontsize=16, weight='bold')
         plt.tight_layout()
 
+        # Simpan gambar ke buffer
         buf = io.BytesIO()
         plt.savefig(buf, format='png')
         buf.seek(0)
