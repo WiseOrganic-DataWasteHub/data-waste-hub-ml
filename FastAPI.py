@@ -28,18 +28,20 @@ def get_token():
     else:
         raise Exception(f"Failed to get token. Status Code: {response.status_code}, Response: {response.text}")
 
-# Fungsi untuk mengambil data dari API (fleksibel untuk bulan+tahun atau hanya tahun)
-def fetch_data_with_token(month: int = None, year: int = None):
+# Fungsi untuk mengambil data dari API (fleksibel: hari+bulan+tahun, bulan+tahun, atau hanya tahun)
+def fetch_data_with_token(day: int = None, month: int = None, year: int = None):
     token = get_token()  # Ambil token secara otomatis
     headers = {"Authorization": f"Bearer {token}"}
     
-    if month is not None and year is not None:
+    if day is not None and month is not None and year is not None:
+        url = f"http://34.101.242.121:3000/api/v1/waste-records/day/{day}/month/{month}/year/{year}"
+    elif month is not None and year is not None:
         url = f"http://34.101.242.121:3000/api/v1/waste-records/month/{month}/year/{year}"
     elif year is not None:
         url = f"http://34.101.242.121:3000/api/v1/waste-records/year/{year}"
     else:
-        raise Exception("Invalid parameters: Please specify either year or month and year.")
-
+        raise Exception("Invalid parameters: Please specify year, or month and year, or day, month, and year.")
+    
     response = requests.get(url, headers=headers)
     if response.status_code == 200:
         data = response.json()["data"]
@@ -53,18 +55,18 @@ def fetch_data_with_token(month: int = None, year: int = None):
 
 # Endpoint untuk mengambil data
 @app.get("/fetch-data/")
-def fetch_data(month: int = Query(None), year: int = Query(...)):
+def fetch_data(day: int = Query(None), month: int = Query(None), year: int = Query(...)):
     try:
-        data = fetch_data_with_token(month=month, year=year)
+        data = fetch_data_with_token(day=day, month=month, year=year)
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
 
 # Endpoint untuk visualisasi bar chart
 @app.get("/visualize-bar-chart/")
-def visualize_bar_chart(month: int = Query(None), year: int = Query(...)):
+def visualize_bar_chart(day: int = Query(None), month: int = Query(None), year: int = Query(...)):
     try:
-        data = fetch_data_with_token(month=month, year=year)
+        data = fetch_data_with_token(day=day, month=month, year=year)
         cleaned_data = [
             {
                 "departement_name": item["departement"]["departement_name"],
@@ -84,7 +86,9 @@ def visualize_bar_chart(month: int = Query(None), year: int = Query(...)):
         
         # Judul dinamis berdasarkan parameter
         title = f"Total Berat Sampah per Departemen"
-        if month is not None:
+        if day is not None and month is not None:
+            title += f" ({day}/{month}/{year})"
+        elif month is not None:
             title += f" ({month}/{year})"
         else:
             title += f" (Tahun {year})"
@@ -110,9 +114,9 @@ def visualize_bar_chart(month: int = Query(None), year: int = Query(...)):
 
 # Endpoint untuk visualisasi pie chart
 @app.get("/visualize-pie-chart/")
-def visualize_pie_chart(month: int = Query(None), year: int = Query(...)):
+def visualize_pie_chart(day: int = Query(None), month: int = Query(None), year: int = Query(...)):
     try:
-        data = fetch_data_with_token(month=month, year=year)
+        data = fetch_data_with_token(day=day, month=month, year=year)
         cleaned_data = [
             {
                 "departement_name": item["departement"]["departement_name"],
@@ -157,7 +161,9 @@ def visualize_pie_chart(month: int = Query(None), year: int = Query(...)):
         )
         
         title = f"Distribusi Sampah per Departemen"
-        if month is not None:
+        if day is not None and month is not None:
+            title += f" ({day}/{month}/{year})"
+        elif month is not None:
             title += f" ({month}/{year})"
         else:
             title += f" (Tahun {year})"
@@ -174,9 +180,9 @@ def visualize_pie_chart(month: int = Query(None), year: int = Query(...)):
 
 # Endpoint untuk visualisasi pie chart berdasarkan kategori sampah
 @app.get("/visualize-pie-chart-categories/")
-def visualize_pie_chart_categories(month: int = Query(None), year: int = Query(...)):
+def visualize_pie_chart_categories(day: int = Query(None), month: int = Query(None), year: int = Query(...)):
     try:
-        data = fetch_data_with_token(month=month, year=year)
+        data = fetch_data_with_token(day=day, month=month, year=year)
         
         categories_data = []
         for item in data:
@@ -227,13 +233,15 @@ def visualize_pie_chart_categories(month: int = Query(None), year: int = Query(.
             legend_labels,
             title="Jenis Sampah dan Persentase",
             loc="center left",
-            bbox_to_anchor=(1.1, 0.2),
+            bbox_to_anchor=(1.1, 0.3),
             fontsize=10,
             ncol=1
         )
         
         title = f"Distribusi Jenis Sampah"
-        if month is not None:
+        if day is not None and month is not None:
+            title += f" ({day}/{month}/{year})"
+        elif month is not None:
             title += f" ({month}/{year})"
         else:
             title += f" (Tahun {year})"
