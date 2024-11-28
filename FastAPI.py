@@ -6,10 +6,7 @@ import pandas as pd
 import seaborn as sns
 import numpy as np
 
-# Menggunakan backend non-interaktif untuk Matplotlib
 plt.switch_backend('Agg')
-
-# Inisialisasi aplikasi FastAPI
 app = FastAPI()
 
 # -------------------------- FUNGSI UTAMA --------------------------------
@@ -276,6 +273,8 @@ def visualize_pie_chart_categories(day: int = Query(None), month: int = Query(No
     except Exception as e:
         return {"success": False, "error": str(e)}
 
+# Endpoint untuk visualisasi pie chart kesimpulan
+# Endpoint untuk visualisasi pie chart kesimpulan
 @app.get("/visualize-pie-chart-summary/")
 def visualize_pie_chart_summary(day: int = Query(None), month: int = Query(None), year: int = Query(...)):
     try:
@@ -293,9 +292,6 @@ def visualize_pie_chart_summary(day: int = Query(None), month: int = Query(None)
         # Data summary
         summary_data = {"Organik": 0, "Non-Organik": 0, "Residue": 0}
 
-        # Debug: Print data untuk memastikan kategori diterima
-        print("Data received from API:", data)
-
         # Proses data dengan validasi
         for item in data:
             for category in item.get("categories", []):
@@ -305,9 +301,6 @@ def visualize_pie_chart_summary(day: int = Query(None), month: int = Query(None)
                     continue
                 category_name = category_obj.get("category_name", "").upper()
                 total_weight = category.get("total_weight", 0)
-
-                # Debug: Print setiap kategori yang diproses
-                print(f"Processing category: {category_name}, Weight: {total_weight}")
 
                 # Klasifikasi kategori
                 if category_name in category_mapping["Organik"]:
@@ -334,12 +327,16 @@ def visualize_pie_chart_summary(day: int = Query(None), month: int = Query(None)
 
         # Membuat pie chart
         plt.figure(figsize=(14, 8))
-        wedges, texts = plt.pie(
+        wedges, texts, autotexts = plt.pie(
             sizes,
             startangle=140,
             colors=plt.cm.Paired.colors,
             wedgeprops={'edgecolor': 'black'},
+            autopct=lambda p: f"{p:.1f}%" if p > 0 else "",  # Menambahkan persentase di pie chart
+            textprops={'fontsize': 12, 'weight': 'bold'}  # Format teks persentase
         )
+
+        # Menambahkan annotasi ke wedge
         for i, wedge in enumerate(wedges):
             angle = (wedge.theta2 - wedge.theta1) / 2 + wedge.theta1
             x = np.cos(np.radians(angle))
@@ -365,7 +362,7 @@ def visualize_pie_chart_summary(day: int = Query(None), month: int = Query(None)
             legend_labels,
             title="Kelompok Sampah, Total Berat, dan Persentase",
             loc="center left",
-            bbox_to_anchor=(1.1, 0.3),
+            bbox_to_anchor=(1, 0.3),
             fontsize=10,
             ncol=1
         )
@@ -382,7 +379,6 @@ def visualize_pie_chart_summary(day: int = Query(None), month: int = Query(None)
         plt.title(title, fontsize=16, weight='bold')
         plt.tight_layout()
 
-        # Simpan gambar ke buffer
         buf = io.BytesIO()
         plt.savefig(buf, format='png')
         buf.seek(0)
