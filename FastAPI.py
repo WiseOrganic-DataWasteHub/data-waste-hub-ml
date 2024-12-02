@@ -272,8 +272,7 @@ def visualize_pie_chart_categories(day: int = Query(None), month: int = Query(No
         return Response(content=buf.getvalue(), media_type="image/png")
     except Exception as e:
         return {"success": False, "error": str(e)}
-
-# Endpoint untuk visualisasi pie chart kesimpulan
+    
 # Endpoint untuk visualisasi pie chart kesimpulan
 @app.get("/visualize-pie-chart-summary/")
 def visualize_pie_chart_summary(day: int = Query(None), month: int = Query(None), year: int = Query(...)):
@@ -387,3 +386,107 @@ def visualize_pie_chart_summary(day: int = Query(None), month: int = Query(None)
         return Response(content=buf.getvalue(), media_type="image/png")
     except Exception as e:
         return {"success": False, "error": str(e)}
+
+# Endpoint untuk visualisasi pie chart berdasarkan departemen
+@app.get("/visualize-departement-pie-chart/")
+def visualize_departement_pie_chart(
+    departement_id: int = Query(...),
+    day: int = Query(None),
+    month: int = Query(None),
+    year: int = Query(...)
+):
+    try:
+        # Ambil data dari API
+        data = fetch_data_with_token(day=day, month=month, year=year)
+
+        # Filter data berdasarkan departement_id
+        filtered_data = [item for item in data if item.get("departement_id") == departement_id]
+        if not filtered_data:
+            raise Exception(f"No data available for departement ID {departement_id}")
+
+        # Ambil nama departemen
+        departement_name = filtered_data[0].get("departement", {}).get("departement_name", f"ID {departement_id}")
+
+        # Data kategori sampah di departemen
+        categories_data = []
+        for item in filtered_data:
+            for category in item.get("categories", []):
+                if category.get("category"):
+                    categories_data.append({
+                        "category_name": category["category"]["category_name"],
+                        "total_weight": category["total_weight"]
+                    })
+
+        if not categories_data:
+            raise Exception(f"No category data available for departement ID {departement_id}")
+
+        # Dataframe dan pengelompokan berdasarkan kategori
+        df = pd.DataFrame(categories_data)
+        grouped_df = df.groupby("category_name")["total_weight"].sum().reset_index()
+        labels = grouped_df["category_name"]
+        sizes = grouped_df["total_weight"]
+
+        # Membuat pie chart
+        plt.figure(figsize=(16, 8))
+        wedges, texts = plt.pie(
+            sizes,
+            labels=None,  # Tidak langsung menampilkan label
+            startangle=140,
+            colors=plt.cm.Set3.colors,
+            wedgeprops={'edgecolor': 'black'},
+        )
+
+        # Tambahkan garis dan label kategori di luar pie chart
+        for i, wedge in enumerate(wedges):
+            angle = (wedge.theta2 - wedge.theta1) / 2 + wedge.theta1
+            x = np.cos(np.radians(angle))
+            y = np.sin(np.radians(angle))
+            # Panah yang lebih dekat
+            plt.annotate(
+                labels[i],
+                xy=(x, y),
+                xytext=(x * 1.3, y * 1.1),  # Jarak panah lebih dekat
+                ha='center',
+                va='center',
+                fontsize=12,
+                weight='bold',
+                arrowprops=dict(arrowstyle="-", color="black")
+            )
+
+        # Membuat legend dengan format baru
+        legend_labels = [
+            f"{label} ({weight} kg) ({weight / sizes.sum() * 100:.1f}%)"
+            for label, weight in zip(labels, sizes)
+        ]
+        plt.legend(
+            wedges,
+            legend_labels,
+            title="Jenis Sampah, Total Berat, dan Persentase",
+            loc="center left",
+            bbox_to_anchor=(1.15, 0.5),
+            fontsize=10,
+            ncol=1
+        )
+
+        # Judul dinamis
+        title = f"Distribusi Jenis Sampah di Departemen {departement_name}"
+        if day is not None and month is not None:
+            title += f" ({day}/{month}/{year})"
+        elif month is not None:
+            title += f" ({month}/{year})"
+        else:
+            title += f" (Tahun {year})"
+
+        plt.title(title, fontsize=16, weight='bold')
+        plt.tight_layout()
+
+        # Simpan gambar ke buffer
+        buf = io.BytesIO()
+        plt.savefig(buf, format='png')
+        buf.seek(0)
+        plt.close()
+
+        return Response(content=buf.getvalue(), media_type="image/png")
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
