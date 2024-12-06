@@ -17,12 +17,12 @@ def get_token():
     data = {"username": "admin", "password": "admin123"}
     response = requests.post(url, json=data)
 
-    print("Response login:", response.status_code, response.text)
+    #print("Response login:", response.status_code, response.text)
     
     if response.status_code == 200:
         response_json = response.json()
         if response_json.get("success"):
-            return response_json["data"]
+            return response_json["data"]["token"]
         else:
             raise Exception(f"Login failed: {response_json.get('message')}")
     else:
@@ -154,13 +154,17 @@ def visualize_pie_chart(day: int = Query(None), month: int = Query(None), year: 
                 weight='bold',
                 arrowprops=dict(arrowstyle="-", color="black")
             )
-        legend_labels = [f"{label} ({percentage})" for label, percentage in zip(labels, percentages)]
+
+        legend_labels = [
+            f"{label} ({size} kg) ({percentage})"
+            for label, size, percentage in zip(labels, sizes, percentages)
+        ]
         plt.legend(
             wedges,
             legend_labels,
-            title="Departemen dan Persentase",
+            title="Departemen, Total Berat (kg), dan Persentase",
             loc="upper left",
-            bbox_to_anchor=(1.05, 1),
+            bbox_to_anchor=(1.05, 0.3),
             fontsize=10,
             ncol=1
         )
@@ -183,68 +187,55 @@ def visualize_pie_chart(day: int = Query(None), month: int = Query(None), year: 
     except Exception as e:
         return {"success": False, "error": str(e)}
     
-
+# Endpoint untuk visualisasi pie chart kategori
 @app.get("/visualize-pie-chart-categories/")
 def visualize_pie_chart_categories(day: int = Query(None), month: int = Query(None), year: int = Query(...)):
     try:
-        # Ambil data dari API
         data = fetch_data_with_token(day=day, month=month, year=year)
 
-        # Validasi bahwa data adalah list
         if not isinstance(data, list):
             raise Exception(f"Invalid data format: Expected a list, got {type(data).__name__}")
 
         categories_data = []
         for idx, item in enumerate(data):
-            # Debugging: Tampilkan tipe dan isi setiap item
-            print(f"Item ke-{idx}: Tipe = {type(item)}, Isi = {item}")
-
-            # Validasi bahwa item adalah dictionary
+            #print(f"Item ke-{idx}: Tipe = {type(item)}, Isi = {item}")
             if not isinstance(item, dict):
                 print(f"Item ke-{idx} tidak valid (bukan dict):", item)
                 continue
 
-            # Validasi bahwa item memiliki key "categories" yang berbentuk list
             categories = item.get("categories")
             if not isinstance(categories, list):
-                print(f"Item ke-{idx} memiliki categories tidak valid (bukan list):", categories)
+                #print(f"Item ke-{idx} memiliki categories tidak valid (bukan list):", categories)
                 continue
 
             for cat_idx, category in enumerate(categories):
-                # Debugging: Tampilkan tipe dan isi setiap kategori
-                print(f"Kategori ke-{cat_idx} di item ke-{idx}: Tipe = {type(category)}, Isi = {category}")
+                #print(f"Kategori ke-{cat_idx} di item ke-{idx}: Tipe = {type(category)}, Isi = {category}")
 
-                # Validasi bahwa "category" ada dan berbentuk dict
                 if not isinstance(category, dict):
-                    print(f"Kategori ke-{cat_idx} di item ke-{idx} tidak valid (bukan dict):", category)
+                    #print(f"Kategori ke-{cat_idx} di item ke-{idx} tidak valid (bukan dict):", category)
                     continue
 
                 category_obj = category.get("category")
                 if not isinstance(category_obj, dict):
-                    print(f"Kategori objek ke-{cat_idx} di item ke-{idx} tidak valid (bukan dict):", category_obj)
+                    #print(f"Kategori objek ke-{cat_idx} di item ke-{idx} tidak valid (bukan dict):", category_obj)
                     continue
-
-                # Masukkan data kategori yang valid
                 categories_data.append({
                     "category_name": category_obj.get("category_name", "Unknown"),
                     "total_weight": category.get("total_weight", 0)
                 })
 
         # Debugging: Tampilkan data kategori yang berhasil dikumpulkan
-        print("Data kategori yang berhasil dikumpulkan:", categories_data)
+        #print("Data kategori yang berhasil dikumpulkan:", categories_data)
 
-        # Pastikan ada data kategori
         if not categories_data:
             raise Exception("No valid category data available for the specified parameters.")
 
-        # Buat DataFrame dan kelompokkan data
         df = pd.DataFrame(categories_data)
         grouped_df = df.groupby("category_name")["total_weight"].sum().reset_index()
         labels = grouped_df["category_name"]
         sizes = grouped_df["total_weight"]
         percentages = [f"{size / sizes.sum() * 100:.1f}%" for size in sizes]
 
-        # Buat pie chart
         plt.figure(figsize=(16, 8))
         wedges, texts = plt.pie(
             sizes,
@@ -276,12 +267,11 @@ def visualize_pie_chart_categories(day: int = Query(None), month: int = Query(No
             legend_labels,
             title="Jenis Sampah, Total Berat, dan Persentase",
             loc="center left",
-            bbox_to_anchor=(1.15, 0.5),
+            bbox_to_anchor=(1.15, 0.3),
             fontsize=10,
             ncol=1
         )
 
-        # Judul dinamis
         title = f"Distribusi Jenis Sampah"
         if day is not None and month is not None:
             title += f" ({day}/{month}/{year})"
@@ -300,15 +290,8 @@ def visualize_pie_chart_categories(day: int = Query(None), month: int = Query(No
 
         return Response(content=buf.getvalue(), media_type="image/png")
     except Exception as e:
-        # Log error untuk debugging
         print("Error:", e)
         return {"success": False, "error": str(e)}
-
-
-
-
-
-
     
 # Endpoint untuk visualisasi pie chart kesimpulan
 @app.get("/visualize-pie-chart-summary/")
@@ -475,9 +458,9 @@ def visualize_departement_pie_chart(
         plt.legend(
             wedges,
             legend_labels,
-            title="Jenis Sampah, Total Berat, dan Persentase",
+            title="Jenis Sampah, Berat, & Persentase",
             loc="center left",
-            bbox_to_anchor=(1.15, 0.5),
+            bbox_to_anchor=(1.15, 0.3),
             fontsize=10,
             ncol=1
         )
