@@ -16,8 +16,6 @@ def get_token():
     url = "http://34.101.242.121:3000/api/v1/auth/login"
     data = {"username": "admin", "password": "admin123"}
     response = requests.post(url, json=data)
-
-    #print("Response login:", response.status_code, response.text)
     
     if response.status_code == 200:
         response_json = response.json()
@@ -224,7 +222,6 @@ def visualize_pie_chart_categories(day: int = Query(None), month: int = Query(No
                     "total_weight": category.get("total_weight", 0)
                 })
 
-        # Debugging: Tampilkan data kategori yang berhasil dikumpulkan
         #print("Data kategori yang berhasil dikumpulkan:", categories_data)
 
         if not categories_data:
