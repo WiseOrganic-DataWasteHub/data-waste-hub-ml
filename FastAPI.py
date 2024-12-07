@@ -9,8 +9,6 @@ import numpy as np
 plt.switch_backend('Agg')
 app = FastAPI()
 
-# -------------------------- FUNGSI UTAMA --------------------------------
-
 # Fungsi untuk mendapatkan token
 def get_token():
     url = "http://34.101.242.121:3000/api/v1/auth/login"
