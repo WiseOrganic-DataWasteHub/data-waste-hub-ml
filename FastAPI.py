@@ -315,7 +315,7 @@ def visualize_pie_chart_summary(day: int = Query(None), month: int = Query(None)
         data = fetch_data_with_token(day=day, month=month, year=year)
 
         category_mapping = {
-            "Organik": ["WET ORGANIK"],
+            "Organik": ["WET ORGANIK", "WET ORGANIC"],
             "Non-Organik": ["PET", "ALUMINIUM CAN", "TETRA PACK", "GLASS BOTTLE"],
             "Residue": ["GENERAL PLASTIC RESIDUE", "GENERAL PAPER RESIDUE",
                         "PLASTIK BAG LINER", "CANDLES", "SLIPPERS"]
