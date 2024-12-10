@@ -9,12 +9,16 @@ import numpy as np
 plt.switch_backend('Agg')
 app = FastAPI()
 
+# -------------------------- FUNGSI UTAMA --------------------------------
+
 # Fungsi untuk mendapatkan token
 def get_token():
-    url = "http://34.101.242.121:3000/api/v1/auth/login"
+    url = "https://data-waste-hub-api-688382515205.asia-southeast2.run.app/api/v1/auth/login"
     data = {"username": "admin", "password": "admin123"}
     response = requests.post(url, json=data)
     
+    #print("Response Login:", response.status_code, response.text)
+
     if response.status_code == 200:
         response_json = response.json()
         if response_json.get("success"):
@@ -26,19 +30,29 @@ def get_token():
 
 # Fungsi untuk mengambil data dari API (fleksibel: hari+bulan+tahun, bulan+tahun, atau hanya tahun)
 def fetch_data_with_token(day: int = None, month: int = None, year: int = None):
-    token = get_token() 
+    token = get_token()
     headers = {"Authorization": f"Bearer {token}"}
-    
+
+    # URL API berdasarkan parameter
     if day is not None and month is not None and year is not None:
-        url = f"http://34.101.242.121:3000/api/v1/waste-records/day/{day}/month/{month}/year/{year}"
+        url = f"https://data-waste-hub-api-688382515205.asia-southeast2.run.app/api/v1/waste-records/day/{day}/month/{month}/year/{year}"
     elif month is not None and year is not None:
-        url = f"http://34.101.242.121:3000/api/v1/waste-records/month/{month}/year/{year}"
+        url = f"https://data-waste-hub-api-688382515205.asia-southeast2.run.app/api/v1/waste-records/month/{month}/year/{year}"
     elif year is not None:
-        url = f"http://34.101.242.121:3000/api/v1/waste-records/year/{year}"
+        url = f"https://data-waste-hub-api-688382515205.asia-southeast2.run.app/api/v1/waste-records/year/{year}"
     else:
         raise Exception("Invalid parameters: Please specify year, or month and year, or day, month, and year.")
-    
+
+    # Debug URL
+    print(f"Fetching data from URL: {url}")
+
+    # Request ke API
     response = requests.get(url, headers=headers)
+
+    # Debug response
+    print(f"Response Code: {response.status_code}")
+    print(f"Response Body: {response.text}")
+
     if response.status_code == 200:
         data = response.json()["data"]
         if len(data) == 0:
@@ -47,6 +61,7 @@ def fetch_data_with_token(day: int = None, month: int = None, year: int = None):
     else:
         raise Exception(f"Failed to fetch data. Status Code: {response.status_code}, Response: {response.text}")
 
+
 # -------------------------- ENDPOINTS -----------------------------------
 
 # Endpoint untuk mengambil data
@@ -54,8 +69,13 @@ def fetch_data_with_token(day: int = None, month: int = None, year: int = None):
 def fetch_data(day: int = Query(None), month: int = Query(None), year: int = Query(...)):
     try:
         data = fetch_data_with_token(day=day, month=month, year=year)
+        
+        # Debugging data hasil fetch
+        #print("Data yang diterima:", data)
+        
         return {"success": True, "data": data}
     except Exception as e:
+        print("Error Fetching Data:", str(e))
         return {"success": False, "error": str(e)}
 
 # Endpoint untuk visualisasi bar chart
