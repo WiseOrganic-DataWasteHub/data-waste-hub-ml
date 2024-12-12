@@ -503,3 +503,6 @@ def visualize_departement_pie_chart(
         return Response(content=buf.getvalue(), media_type="image/png")
     except Exception as e:
         return {"success": False, "error": str(e)}
+    
+    #tes
+
