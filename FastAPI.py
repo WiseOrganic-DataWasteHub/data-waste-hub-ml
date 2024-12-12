@@ -504,6 +504,4 @@ def visualize_departement_pie_chart(
     except Exception as e:
         return {"success": False, "error": str(e)}
     
-    #tes
-    print("tes")
 
