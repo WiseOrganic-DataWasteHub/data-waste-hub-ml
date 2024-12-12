@@ -43,15 +43,10 @@ def fetch_data_with_token(day: int = None, month: int = None, year: int = None):
     else:
         raise Exception("Invalid parameters: Please specify year, or month and year, or day, month, and year.")
 
-    # Debug URL
-    print(f"Fetching data from URL: {url}")
-
-    # Request ke API
+    #print(f"Fetching data from URL: {url}")
     response = requests.get(url, headers=headers)
-
-    # Debug response
-    print(f"Response Code: {response.status_code}")
-    print(f"Response Body: {response.text}")
+    # print(f"Response Code: {response.status_code}")
+    # print(f"Response Body: {response.text}")
 
     if response.status_code == 200:
         data = response.json()["data"]
@@ -69,13 +64,12 @@ def fetch_data_with_token(day: int = None, month: int = None, year: int = None):
 def fetch_data(day: int = Query(None), month: int = Query(None), year: int = Query(...)):
     try:
         data = fetch_data_with_token(day=day, month=month, year=year)
-        
-        # Debugging data hasil fetch
-        #print("Data yang diterima:", data)
-        
-        return {"success": True, "data": data}
+
+        # Debug: Cetak data mentah
+        #print("Data Mentah:", data)
+
+        return {"success": True, "raw_data": data}
     except Exception as e:
-        print("Error Fetching Data:", str(e))
         return {"success": False, "error": str(e)}
 
 # Endpoint untuk visualisasi bar chart
@@ -86,14 +80,19 @@ def visualize_bar_chart(day: int = Query(None), month: int = Query(None), year: 
         cleaned_data = [
             {
                 "departement_name": item["departement"]["departement_name"],
-                "total_weight": item["total_weight"]
+                "total_weight":  round(item["total_weight"], 2)
             }
             for item in data if item["departement"] is not None
         ]
+
+        #print("Data Dibersihkan:", cleaned_data)
         df = pd.DataFrame(cleaned_data)
 
         all_departments = ["Front Office", "Accounting", "HRD", "Spa", "Security", "Kitchen", "Restaurant and Bar", "Garden"]
         df = df.set_index("departement_name").reindex(all_departments, fill_value=0).reset_index()
+
+        max_weight = df["total_weight"].max()
+        y_max = max_weight + 10 
 
         plt.figure(figsize=(14, 6))
         sns.barplot(
@@ -112,11 +111,12 @@ def visualize_bar_chart(day: int = Query(None), month: int = Query(None), year: 
         else:
             title += f" (Tahun {year})"
 
-        plt.title(title, fontsize=18, weight='bold', color='darkblue', pad=20)  # Tambahkan jarak antar elemen
+        plt.title(title, fontsize=18, weight='bold', color='darkblue', pad=20)  
         plt.xlabel("Departemen", fontsize=14, weight='bold')
         plt.ylabel("Berat Sampah (kg)", fontsize=14, weight='bold')
         plt.xticks(rotation=45, fontsize=12, ha='right', weight='bold')
         plt.yticks(fontsize=12, weight='bold')
+        plt.ylim(0, y_max)
 
         for index, row in df.iterrows():
             if row["total_weight"] > 0: 
@@ -141,7 +141,7 @@ def visualize_pie_chart(day: int = Query(None), month: int = Query(None), year: 
         cleaned_data = [
             {
                 "departement_name": item["departement"]["departement_name"],
-                "total_weight": item["total_weight"]
+                "total_weight": round(item["total_weight"], 2)
             }
             for item in data if item["departement"] is not None
         ]
@@ -216,7 +216,7 @@ def visualize_pie_chart_categories(day: int = Query(None), month: int = Query(No
         for idx, item in enumerate(data):
             #print(f"Item ke-{idx}: Tipe = {type(item)}, Isi = {item}")
             if not isinstance(item, dict):
-                print(f"Item ke-{idx} tidak valid (bukan dict):", item)
+                # print(f"Item ke-{idx} tidak valid (bukan dict):", item)
                 continue
 
             categories = item.get("categories")
@@ -247,6 +247,7 @@ def visualize_pie_chart_categories(day: int = Query(None), month: int = Query(No
 
         df = pd.DataFrame(categories_data)
         grouped_df = df.groupby("category_name")["total_weight"].sum().reset_index()
+        grouped_df["total_weight"] = grouped_df["total_weight"].apply(lambda x: round(x, 2)) 
         labels = grouped_df["category_name"]
         sizes = grouped_df["total_weight"]
         percentages = [f"{size / sizes.sum() * 100:.1f}%" for size in sizes]
@@ -305,7 +306,7 @@ def visualize_pie_chart_categories(day: int = Query(None), month: int = Query(No
 
         return Response(content=buf.getvalue(), media_type="image/png")
     except Exception as e:
-        print("Error:", e)
+        # print("Error:", e)
         return {"success": False, "error": str(e)}
     
 # Endpoint untuk visualisasi pie chart kesimpulan
@@ -340,6 +341,9 @@ def visualize_pie_chart_summary(day: int = Query(None), month: int = Query(None)
 
         if sum(summary_data.values()) == 0:
             raise Exception("No data available for the specified parameters.")
+
+        for category, weight in summary_data.items():
+            summary_data[category] = round(weight, 2) 
 
         df_summary = pd.DataFrame(
             {"Category": list(summary_data.keys()), "Total Weight": list(summary_data.values())}
@@ -430,7 +434,7 @@ def visualize_departement_pie_chart(
                 if category.get("category"):
                     categories_data.append({
                         "category_name": category["category"]["category_name"],
-                        "total_weight": category["total_weight"]
+                        "total_weight": round(category["total_weight"], 2)
                     })
 
         if not categories_data:
@@ -467,7 +471,7 @@ def visualize_departement_pie_chart(
             )
 
         legend_labels = [
-            f"{label} ({weight} kg) ({weight / sizes.sum() * 100:.1f}%)"
+            f"{label} ({weight} kg)  ({round(weight / sizes.sum() * 100, 1)}%)"
             for label, weight in zip(labels, sizes)
         ]
         plt.legend(
