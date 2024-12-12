@@ -505,4 +505,5 @@ def visualize_departement_pie_chart(
         return {"success": False, "error": str(e)}
     
     #tes
+    print("tes")
 
